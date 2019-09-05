@@ -11,14 +11,20 @@ class Shop(models.Model):
     time_to_open = models.TimeField()
     time_to_close = models.TimeField()
 
+    def __str__(self):
+        return '{name}'.format(name=self.name)
+
 
 class City(models.Model):
     name = models.CharField(max_length=255)
 
+    def __str__(self):
+        return '{name}'.format(name=self.name)
+
 
 class Street(models.Model):
     name = models.CharField(max_length=255)
-    city = models.ManyToManyField('City')
+    city = models.ManyToManyField('City', related_name='streets')
 
 
 
