@@ -8,8 +8,8 @@ class Shop(models.Model):
     city = models.ForeignKey('City', on_delete=models.CASCADE)
     street = models.ForeignKey('Street', on_delete=models.CASCADE)
     building_number = models.CharField(max_length=255)
-    time_to_open = models.TimeField()
-    time_to_close = models.TimeField()
+    opening_time = models.TimeField()
+    closing_time = models.TimeField()
 
     def __str__(self):
         return '{name}'.format(name=self.name)
