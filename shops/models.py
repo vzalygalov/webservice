@@ -12,19 +12,25 @@ class Shop(models.Model):
     closing_time = models.TimeField()
 
     def __str__(self):
-        return '{name}'.format(name=self.name)
+        return self.name
 
 
 class City(models.Model):
     name = models.CharField(max_length=255)
 
+    class Meta:
+        verbose_name_plural = "cities"
+
     def __str__(self):
-        return '{name}'.format(name=self.name)
+        return self.name
 
 
 class Street(models.Model):
     name = models.CharField(max_length=255)
     city = models.ManyToManyField('City', related_name='streets')
+
+    def __str__(self):
+        return self.name
 
 
 
