@@ -19,7 +19,7 @@ class StreetAdmin(admin.ModelAdmin):
 
 
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ('name', 'city', 'street')
+    list_display = ('name', 'city', 'street', 'building_number')
     search_fields = ('name', 'city__name', 'street__name')
 
 
