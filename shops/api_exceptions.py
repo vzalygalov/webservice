@@ -17,8 +17,6 @@ class ObjectNotFound(ShopError):
         detail = {name: 'not found.'}
         self.detail = _get_error_details(detail)
 
-    #error_message = {name: '{object_name} is not found.'.format(object_name=object_name)}
-
 
 class StatusError(ShopError):
 
@@ -34,6 +32,3 @@ class DuplicateError(ShopError):
         super().__init__()
         detail = {'shop': ['Invalid input. Object already exists']}
         self.detail = _get_error_details(detail)
-
-
-
