@@ -63,36 +63,44 @@ class ShopView(APIView):
                                                                                       street=given_street)},
                            code=404)
 
+    def check_opening_hours(self, request, queryset, is_open=True):
+        open_shops = []
+        closed_shops = []
+        now = timezone.now().time()
+        for shop in queryset:
+            opening_time = shop.opening_time
+            closing_time = shop.closing_time
+            if opening_time < closing_time:
+                if opening_time <= now <= closing_time:
+                    open_shops.append(shop)
+                else:
+                    closed_shops.append(shop)
+            else:
+                if closing_time < now < opening_time:
+                    closed_shops.append(shop)
+                else:
+                    open_shops.append(shop)
+        if is_open:
+            return open_shops
+        else:
+            return closed_shops
+
     def filter_shop_by_params(self, request, city=None, street=None, is_open=None):
         queryset = Shop.objects.all()
 
         if city:
-            queryset = queryset.filter(city__name=city)
+            try:
+                city_obj = City.objects.get(name=city)
+                queryset = queryset.filter(city=city_obj)
+
+            except City.DoesNotExist:
+                raise ObjectNotFound('city')
 
         if street:
             queryset = queryset.filter(street__name=street)
 
         if is_open is not None:
-            open_shops = []
-            closed_shops = []
-            now = timezone.now().time()
-            for shop in queryset:
-                opening_time = shop.opening_time
-                closing_time = shop.closing_time
-                if opening_time < closing_time:
-                    if opening_time <= now <= closing_time:
-                        open_shops.append(shop)
-                    else:
-                        closed_shops.append(shop)
-                else:
-                    if closing_time < now < opening_time:
-                        closed_shops.append(shop)
-                    else:
-                        open_shops.append(shop)
-            if is_open:
-                return open_shops
-            else:
-                return closed_shops
+            return self.check_opening_hours(request, queryset, is_open)
         return queryset
 
     def validate_params(self, request):
@@ -140,18 +148,9 @@ class ShopView(APIView):
             query_params = self.validate_params(request)
 
             shops = self.filter_shop_by_params(request, **query_params)
-
             serializer = ShopSerializer(shops, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         else:
             shops = Shop.objects.all()
             serializer = ShopSerializer(shops, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
-
-
-
-
