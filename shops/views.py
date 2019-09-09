@@ -1,17 +1,21 @@
+from django.utils import timezone
+from django.db.utils import IntegrityError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework import serializers
 
 from .serializers import CitySerializer, CityStreetSerializer, ShopSerializer
 from .models import City, Street, Shop
+from .api_exceptions import StatusError, ObjectNotFound, DuplicateError
 
 # Create your views here.
 
 
 class ListCities(APIView):
 
-    def get(self, request, format=None):
+    def get(self, request):
         cities = City.objects.all()
         serializer = CitySerializer(cities, many=True)
         return Response(serializer.data)
@@ -19,45 +23,135 @@ class ListCities(APIView):
 
 class ListCityStreets(APIView):
 
-    def get(self, request, pk, format=None):
+    def get(self, request, pk):
         city = City.objects.filter(pk=pk)
         serializer = CityStreetSerializer(city, many=True)
         data = serializer.data
         if data:
             return Response(data)
-        raise NotFound(detail='city is not found', code=404)
+        raise ObjectNotFound(name='city')
 
 
 class ShopView(APIView):
 
     def get_object(self, request, model):
+        request_method = request.method
+
         if model is City:
             name = 'city'
         else:
             name = 'street'
-        object_name = request.data.get(name)
+
+        if request_method == 'POST':
+            object_name = request.data.get(name)
+        else:
+            object_name = request.query_params.get(name)
+
         try:
             return model.objects.get(name=object_name)
         except model.DoesNotExist:
-            raise NotFound(detail='{name} {object_name} is not found.'.format(name=name, object_name=object_name),
-                           code=404)
+            raise ObjectNotFound(name=name)
 
     def get_street(self, request, city):
         streets = city.streets.all()
-        given_street = request.data['street']
-        for street in streets:
-            if given_street == street.name:
-                return self.get_object(request, Street)
-        raise NotFound(detail='street {street} is not found in {city}'.format(city=city.name, street=given_street),
-                       code=404)
+        given_street = request.data.get('street')
+        if given_street:
+            for street in streets:
+                if given_street == street.name:
+                    return self.get_object(request, Street)
+            raise NotFound(detail={'street': '{street} is not found in {city}'.format(city=city.name,
+                                                                                      street=given_street)},
+                           code=404)
 
-    def post(self, request, format=None):
+    def filter_shop_by_params(self, request, city=None, street=None, is_open=None):
+        queryset = Shop.objects.all()
+
+        if city:
+            queryset = queryset.filter(city__name=city)
+
+        if street:
+            queryset = queryset.filter(street__name=street)
+
+        if is_open is not None:
+            open_shops = []
+            closed_shops = []
+            now = timezone.now().time()
+            for shop in queryset:
+                opening_time = shop.opening_time
+                closing_time = shop.closing_time
+                if opening_time < closing_time:
+                    if opening_time <= now <= closing_time:
+                        open_shops.append(shop)
+                    else:
+                        closed_shops.append(shop)
+                else:
+                    if closing_time < now < opening_time:
+                        closed_shops.append(shop)
+                    else:
+                        open_shops.append(shop)
+            if is_open:
+                return open_shops
+            else:
+                return closed_shops
+        return queryset
+
+    def validate_params(self, request):
+        query_params = request.query_params
+
+        params = {'city': query_params.get('city'),
+                  'street': query_params.get('street'),
+                  'open': None
+                  }
+
+        for param in query_params:
+            if param not in params:
+                raise serializers.ValidationError('3', code='required')
+        params.pop('open')
+
+        is_open = query_params.get('open')
+
+        if is_open:
+            try:
+                is_open = int(query_params.get('open'))
+                if is_open in range(2):
+                    params['is_open'] = is_open
+                else:
+                    raise StatusError
+            except ValueError:
+                raise StatusError
+        return params
+
+    def post(self, request):
         city = self.get_object(request, City)
         street = self.get_street(request, city)
         serializer = ShopSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(city=city, street=street)
-            response_data = {'id': serializer.data['id']}
-            return Response(response_data, status=status.HTTP_200_OK)
+            try:
+                serializer.save(city=city, street=street)
+                response_data = {'id': serializer.data['id']}
+                return Response(response_data, status=status.HTTP_200_OK)
+            except IntegrityError:
+                raise DuplicateError
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self, request):
+
+        if request.query_params:
+            query_params = self.validate_params(request)
+
+            shops = self.filter_shop_by_params(request, **query_params)
+
+            serializer = ShopSerializer(shops, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        else:
+            shops = Shop.objects.all()
+            serializer = ShopSerializer(shops, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+
 

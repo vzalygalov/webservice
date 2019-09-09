@@ -11,6 +11,9 @@ class Shop(models.Model):
     opening_time = models.TimeField()
     closing_time = models.TimeField()
 
+    class Meta:
+        unique_together = ('name', 'city', 'street', 'building_number')
+
     def __str__(self):
         return self.name
 
