@@ -31,10 +31,4 @@ class ShopSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Shop
-        #validators = [
-        #    UniqueTogetherValidator(
-        #        queryset=Shop.objects.all(),
-        #    fields=['name', 'building_number'],
-        #    )
-        #]
         fields = ['id', 'name', 'city', 'street', 'building_number', 'opening_time', 'closing_time']
