@@ -32,3 +32,11 @@ class DuplicateError(ShopError):
         super().__init__()
         detail = {'shop': ['Invalid input. Object already exists']}
         self.detail = _get_error_details(detail)
+
+
+class ValidationError(ShopError):
+
+    def __init__(self, name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        detail = {name: ['This field is required.']}
+        self.detail = _get_error_details(detail)

@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 from .serializers import CitySerializer, CityStreetSerializer, ShopSerializer
 from .models import City, Street, Shop
-from .api_exceptions import StatusError, ObjectNotFound, DuplicateError
+from .api_exceptions import StatusError, ObjectNotFound, DuplicateError, ValidationError
 
 # Create your views here.
 
@@ -44,6 +44,8 @@ class ShopView(APIView):
 
         if request_method == 'POST':
             object_name = request.data.get(name)
+            if not object_name:
+                raise ValidationError(name=name)
         else:
             object_name = request.query_params.get(name)
 
@@ -53,15 +55,18 @@ class ShopView(APIView):
             raise ObjectNotFound(name=name)
 
     def get_street(self, request, city):
+        name = 'street'
         streets = city.streets.all()
-        given_street = request.data.get('street')
+        given_street = request.data.get(name)
         if given_street:
             for street in streets:
                 if given_street == street.name:
                     return self.get_object(request, Street)
-            raise NotFound(detail={'street': '{street} is not found in {city}'.format(city=city.name,
+            raise NotFound(detail={name: '{street} is not found in {city}'.format(city=city.name,
                                                                                       street=given_street)},
                            code=404)
+        else:
+            raise ValidationError(name=name)
 
     def check_opening_hours(self, request, queryset, is_open=True):
         open_shops = []
@@ -130,10 +135,10 @@ class ShopView(APIView):
         return params
 
     def post(self, request):
-        city = self.get_object(request, City)
-        street = self.get_street(request, city)
         serializer = ShopSerializer(data=request.data)
         if serializer.is_valid():
+            city = self.get_object(request, City)
+            street = self.get_street(request, city)
             try:
                 serializer.save(city=city, street=street)
                 response_data = {'id': serializer.data['id']}
